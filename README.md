@@ -9,9 +9,11 @@ Goscan is a network scanner using ICMP to detect hosts. The CLI tool scans netwo
 
 ## Usage
 **CLI Tool:**
+
 ```bash
 goscan --interface eth0 --timeout 1000 --measure
 goscan -i eth0 -t 1000 -m
+```
 
 If no interface is specified, it scans all available interfaces.
 
