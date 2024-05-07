@@ -1,7 +1,7 @@
 # goscan
 
 ## Overview
-Goscan is a network scanner using ICMP to detect hosts. The CLI tool scans network interfaces, and the server provides a web interface for network data visualization.
+Goscan is a network scanner using ICMP to detect hosts. The CLI tool scans network interfaces, and the server provides a web interface for enumerating alive hosts.
 
 ## Build
 - CLI tool: `go build ./cmd/goscan.go`
