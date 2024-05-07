@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: MIT
 
+/*
+   Network data logic.
+*/
+
 package networkutils
 
 import (

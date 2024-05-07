@@ -1,33 +1,46 @@
 package stats
 
 import (
-	"fmt"
 	"runtime"
+	"sync"
 	"time"
 )
 
-func MonitorRuntimeStats() {
-	var m runtime.MemStats
-	var lastPauseNs uint64
+type Stats struct {
+	MemAlloc    uint64
+	Sys         uint64
+	LastPauseNs uint64
+	NumGoroutine int
+}
 
-	ticker := time.NewTicker(1 * time.Second)
+var (
+	currentStats Stats
+	statsLock    sync.RWMutex
+)
+
+func UpdateStats() {
+	statsLock.Lock()
+	defer statsLock.Unlock()
+
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+	currentStats.MemAlloc = mem.Alloc
+	currentStats.Sys = mem.Sys
+	currentStats.LastPauseNs = mem.PauseTotalNs
+	currentStats.NumGoroutine = runtime.NumGoroutine()
+}
+
+func GetStats() Stats {
+	statsLock.RLock()
+	defer statsLock.RUnlock()
+	return currentStats
+}
+
+func MonitorRuntimeStats() {
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			runtime.ReadMemStats(&m)
-			total := m.Alloc
-			sys := m.Sys
-			pause := m.PauseTotalNs - lastPauseNs
-
-            /* Mem Alloc is the total number of bytes allocated and not yet freed.
-                Sys is the total number of bytes obtained from the OS.
-                Pause is the total time spent in GC pauses. */
-			fmt.Printf("\r\x1b[2KMemory Alloc: %d KB, Sys: %d KB, Pause: %d ns",
-				total/1024, sys/1024, pause)
-
-			lastPauseNs = m.PauseTotalNs
-		}
+	for range ticker.C {
+		UpdateStats()
 	}
 }

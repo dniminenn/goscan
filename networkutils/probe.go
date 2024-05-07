@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: MIT
 
+/*
+   ICMP probing logic.
+   Uses the go-ping library to send ICMP echo requests to a range of IP addresses.
+*/
+
 package networkutils
 
 import (

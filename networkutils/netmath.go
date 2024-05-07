@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: MIT
 
+/*
+   Shared math functions for network utilities.
+*/
+
 package networkutils
 
 import (
@@ -35,4 +39,24 @@ func incrementIP(ip net.IP) {
             break
         }
     }
+}
+
+func generateIPs(ip net.IP, subnetBits int) []net.IP {
+    var ips []net.IP
+
+    network := ip.Mask(net.CIDRMask(subnetBits, 32))
+    broadcast := make(net.IP, len(network))
+
+    for i, b := range network {
+        broadcast[i] = b | ^net.CIDRMask(subnetBits, 32)[i]
+    }
+
+    currentIP := make(net.IP, len(network))
+    copy(currentIP, network)
+    for ; !currentIP.Equal(broadcast); incrementIP(currentIP) {
+        ips = append(ips, make(net.IP, len(currentIP)))
+        copy(ips[len(ips)-1], currentIP)
+    }
+
+    return ips
 }

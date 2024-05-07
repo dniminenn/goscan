@@ -16,6 +16,7 @@ import (
 	"os/user"
 	"time"
 
+	"goscan/cliargs"
 	"goscan/networkutils"
 	"goscan/stats"
 	"goscan/webutils"
@@ -26,25 +27,50 @@ import (
 var embeddedFiles embed.FS
 
 func main() {
-	// Check if the user is running as root (admin privileges) to use ICMP/ping
-	currentUser, err := user.Current()
-	if err != nil || currentUser.Uid != "0" {
-		log.Fatal("Application requires administrator privileges to perform network scanning.")
-	}
+    config := cliargs.ParseFlags()
 
-	// Initialize runtime statistics monitoring
-	go stats.MonitorRuntimeStats()
+    // Check if the user is running as root (admin privileges) to use ICMP/ping
+    currentUser, err := user.Current()
+    if err != nil || currentUser.Uid != "0" {
+        log.Fatal("Application requires administrator privileges to perform network scanning.")
+    }
 
+    // Initialize runtime statistics monitoring
+    go stats.MonitorRuntimeStats()
+
+    // Setup HTTP handlers
+    http.HandleFunc("/", allNetworksHTMLHandler)
     http.HandleFunc("/all-html", allNetworksHTMLHandler)
-	http.HandleFunc("/networks", listNetworksHandler)
-	http.HandleFunc("/network/", networkHandler)
-	http.HandleFunc("/all", allNetworksHandler)
+    http.HandleFunc("/networks", listNetworksHandler)
+    http.HandleFunc("/network/", networkHandler)
+    http.HandleFunc("/all", allNetworksHandler)
+    http.HandleFunc("/stats", statsHandler)  // New endpoint for statistics
 
-	log.Println("Starting server at port 8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+    // Constructing the address string
+    address := fmt.Sprintf("%s:%s", config.ListenAddress, config.ListenPort)
+    log.Printf("Starting server at %s", address)
+    log.Fatal(http.ListenAndServe(address, nil))
 }
 
+/*
+	statsHandler is an HTTP handler that returns current system statistics.
+*/
+func statsHandler(w http.ResponseWriter, r *http.Request) {
+	stats := stats.GetStats()
 
+	response := map[string]interface{}{
+		"MemoryAllocKB":   stats.MemAlloc / 1024,
+		"SystemMemoryKB":  stats.Sys / 1024,
+		"LastGCPauseNs":   stats.LastPauseNs,
+		"NumberOfGoroutines": stats.NumGoroutine,
+	}
+
+	webutils.WriteJSON(w, response)
+}
+
+/*
+    listNetworksHandler is an HTTP handler that lists all network interfaces on the system.
+*/
 func listNetworksHandler(w http.ResponseWriter, r *http.Request) {
 	ifaces, err := networkutils.DiscoverInterfaces()
 	if err != nil {
@@ -60,6 +86,9 @@ func listNetworksHandler(w http.ResponseWriter, r *http.Request) {
 	webutils.WriteJSON(w, jIfaces)
 }
 
+/*
+	networkHandler is an HTTP handler that probes a specific network interface for active hosts.
+*/
 func networkHandler(w http.ResponseWriter, r *http.Request) {
 	ifaceName := r.URL.Path[len("/network/"):]
 	if ifaceName == "" {
@@ -91,6 +120,10 @@ func networkHandler(w http.ResponseWriter, r *http.Request) {
 	webutils.WriteJSON(w, response)
 }
 
+/*
+	allNetworksHandler is an HTTP handler that probes all network interfaces on the system for active hosts.
+	returning a JSON response.
+*/
 func allNetworksHandler(w http.ResponseWriter, r *http.Request) {
 	data, err := networkutils.FetchAllNetworkData()
 	if err != nil {
@@ -104,6 +137,10 @@ func allNetworksHandler(w http.ResponseWriter, r *http.Request) {
 	webutils.WriteJSON(w, data["results"])
 }
 
+/*
+    allNetworksHTMLHandler is the same as allNetworksHandler but returns an HTML response.
+	Default handler for the root path.
+*/
 func allNetworksHTMLHandler(w http.ResponseWriter, r *http.Request) {
 	data, err := networkutils.FetchAllNetworkData()
 	if err != nil {
@@ -111,7 +148,6 @@ func allNetworksHTMLHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Use embedded file system
 	tmpl, err := template.ParseFS(embeddedFiles, "templates/networks_template.html")
 	if err != nil {
 		http.Error(w, "Failed to load template", http.StatusInternalServerError)

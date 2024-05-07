@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: MIT
 
+/*
+   Shared types and marshalling for network utilities.
+*/
+
 package networkutils
 
 import (
