@@ -22,31 +22,25 @@ import (
 	"goscan/webutils"
 )
 
-// Embedding the templates directory
-//go:embed templates/*
 var embeddedFiles embed.FS
 
 func main() {
     config := cliargs.ParseFlags()
 
-    // Check if the user is running as root (admin privileges) to use ICMP/ping
     currentUser, err := user.Current()
     if err != nil || currentUser.Uid != "0" {
         log.Fatal("Application requires administrator privileges to perform network scanning.")
     }
 
-    // Initialize runtime statistics monitoring
     go stats.MonitorRuntimeStats()
 
-    // Setup HTTP handlers
     http.HandleFunc("/", allNetworksHTMLHandler)
     http.HandleFunc("/all-html", allNetworksHTMLHandler)
     http.HandleFunc("/networks", listNetworksHandler)
     http.HandleFunc("/network/", networkHandler)
     http.HandleFunc("/all", allNetworksHandler)
-    http.HandleFunc("/stats", statsHandler)  // New endpoint for statistics
+    http.HandleFunc("/stats", statsHandler)
 
-    // Constructing the address string
     address := fmt.Sprintf("%s:%s", config.ListenAddress, config.ListenPort)
     log.Printf("Starting server at %s", address)
     log.Fatal(http.ListenAndServe(address, nil))
