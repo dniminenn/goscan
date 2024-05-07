@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func FetchAllNetworkData() (map[string]interface{}, error) {
+func FetchAllNetworkData(timeout time.Duration) (map[string]interface{}, error) {
 	startTime := time.Now()
 	ifaces, err := DiscoverInterfaces()
 	if err != nil {
@@ -24,7 +24,7 @@ func FetchAllNetworkData() (map[string]interface{}, error) {
 		wg.Add(1)
 		go func(iface InterfaceDetails) {
 			defer wg.Done()
-			activeHosts, err := ProbeHostsICMP(&iface, time.Millisecond*200)
+			activeHosts, err := ProbeHostsICMP(&iface, timeout)
 			if err != nil {
 				results[iface.Name] = map[string]interface{}{"error": err.Error()}
 				return

@@ -22,10 +22,13 @@ import (
 	"goscan/webutils"
 )
 
-var embeddedFiles embed.FS
+var (
+    embeddedFiles embed.FS
+    config        cliargs.Config
+)
 
 func main() {
-    config := cliargs.ParseFlags()
+    config = cliargs.ParseFlags()
 
     currentUser, err := user.Current()
     if err != nil || currentUser.Uid != "0" {
@@ -84,34 +87,34 @@ func listNetworksHandler(w http.ResponseWriter, r *http.Request) {
 	networkHandler is an HTTP handler that probes a specific network interface for active hosts.
 */
 func networkHandler(w http.ResponseWriter, r *http.Request) {
-	ifaceName := r.URL.Path[len("/network/"):]
-	if ifaceName == "" {
-		http.Error(w, "Interface name is required.", http.StatusBadRequest)
-		return
-	}
+    ifaceName := r.URL.Path[len("/network/"):]
+    if ifaceName == "" {
+        http.Error(w, "Interface name is required.", http.StatusBadRequest)
+        return
+    }
 
-	iface, err := networkutils.GetInterfaceByName(ifaceName)
-	if err != nil {
-		http.Error(w, "Interface not found.", http.StatusNotFound)
-		return
-	}
+    iface, err := networkutils.GetInterfaceByName(ifaceName)
+    if err != nil {
+        http.Error(w, "Interface not found.", http.StatusNotFound)
+        return
+    }
 
-	activeHosts, err := networkutils.ProbeHostsICMP(iface, time.Millisecond*100)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Error probing hosts: %v", err), http.StatusInternalServerError)
-		return
-	}
+    activeHosts, err := networkutils.ProbeHostsICMP(iface, config.Timeout)
+    if err != nil {
+        http.Error(w, fmt.Sprintf("Error probing hosts: %v", err), http.StatusInternalServerError)
+        return
+    }
 
-	networkutils.SortIPs(activeHosts)
-	response := struct {
-		InterfaceDetails networkutils.InterfaceDetailsJSON `json:"interface"`
-		ActiveHosts      []net.IP                           `json:"activeHosts"`
-	}{
-		InterfaceDetails: iface.ToJSON(),
-		ActiveHosts:      activeHosts,
-	}
+    networkutils.SortIPs(activeHosts)
+    response := struct {
+        InterfaceDetails networkutils.InterfaceDetailsJSON `json:"interface"`
+        ActiveHosts      []net.IP                           `json:"activeHosts"`
+    }{
+        InterfaceDetails: iface.ToJSON(),
+        ActiveHosts:      activeHosts,
+    }
 
-	webutils.WriteJSON(w, response)
+    webutils.WriteJSON(w, response)
 }
 
 /*
@@ -119,7 +122,7 @@ func networkHandler(w http.ResponseWriter, r *http.Request) {
 	returning a JSON response.
 */
 func allNetworksHandler(w http.ResponseWriter, r *http.Request) {
-	data, err := networkutils.FetchAllNetworkData()
+	data, err := networkutils.FetchAllNetworkData(config.Timeout)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -136,7 +139,7 @@ func allNetworksHandler(w http.ResponseWriter, r *http.Request) {
 	Default handler for the root path.
 */
 func allNetworksHTMLHandler(w http.ResponseWriter, r *http.Request) {
-	data, err := networkutils.FetchAllNetworkData()
+	data, err := networkutils.FetchAllNetworkData(config.Timeout)
 	if err != nil {
 		http.Error(w, "Failed to fetch network data", http.StatusInternalServerError)
 		return

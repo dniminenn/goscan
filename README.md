@@ -19,8 +19,8 @@ Server:
 
 ```bash
 
-./goscan-server --listen-address "192.168.1.1" --listen-port "8080"
-./goscan-server -l "192.168.1.1" -p "8080"
+./goscan-server --listen-address "192.168.1.1" --listen-port "8080" --timeout 500
+./goscan-server -l "192.168.1.1" -p "8080" -t 500
 ```
 
 ## Command Line Arguments
@@ -35,6 +35,7 @@ Server:
 ```bash
     --listen-address, -l: IP address for the server (default: "0.0.0.0").
     --listen-port, -p: Port number (default: "8080").
+    --timeout, -t: Timeout in milliseconds (default: 500).
 ```
 ## Privileges
 
