@@ -5,45 +5,29 @@ package cliargs
 */
 
 import (
-	"flag"
 	"time"
+
+	"github.com/spf13/pflag"
 )
 
 type Config struct {
-    ListenAddress string
-    ListenPort    string
-    Timeout       time.Duration
+	ListenAddress string
+	ListenPort    string
+	Timeout       time.Duration
 }
 
 const (
-    DefaultTimeout = 500
+	DefaultTimeout = 100
 )
 
 func ParseFlags() Config {
-    listenAddress := flag.String("listen-address", "0.0.0.0", "IP address for the server to listen on")
-    listenPort := flag.String("listen-port", "8080", "Port number for the server to listen on")
-    shortAddress := flag.String("l", "", "Short form of IP address for the server to listen on")
-    shortPort := flag.String("p", "", "Short form of port number for the server to listen on")
-    timeoutValue := flag.Int("timeout", DefaultTimeout, "Timeout value for network operations in milliseconds")
-    timeoutValueShort := flag.Int("t", 0, "Short form of timeout value for network operations in milliseconds")
+	var cfg Config
 
-    flag.Parse()
+	pflag.StringVarP(&cfg.ListenAddress, "listen-address", "l", "0.0.0.0", "IP address for the server to listen on")
+	pflag.StringVarP(&cfg.ListenPort, "listen-port", "p", "8080", "Port number for the server to listen on")
+	pflag.DurationVarP(&cfg.Timeout, "timeout", "t", time.Duration(DefaultTimeout)*time.Millisecond, "Timeout value for network operations")
 
-    if *shortAddress != "" {
-        *listenAddress = *shortAddress
-    }
-    if *shortPort != "" {
-        *listenPort = *shortPort
-    }
+	pflag.Parse()
 
-    effectiveTimeout := *timeoutValue
-    if *timeoutValueShort != 0 {
-        effectiveTimeout = *timeoutValueShort
-    }
-
-    return Config{
-        ListenAddress: *listenAddress,
-        ListenPort:    *listenPort,
-        Timeout:       time.Duration(effectiveTimeout) * time.Millisecond,
-    }
+	return cfg
 }

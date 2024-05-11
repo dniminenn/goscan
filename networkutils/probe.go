@@ -23,14 +23,12 @@ func SortIPs(ips []net.IP) {
     })
 }
 
-
-func ProbeHostsICMP(ifaceDetails *InterfaceDetails, timeout time.Duration) ([]net.IP, error) {
+func ProbeHostsICMP(ifaceDetails *InterfaceDetails, initialTimeout time.Duration) ([]net.IP, error) {
 	var wg sync.WaitGroup
 	resultsChan := make(chan pingResult, 100)
 	var activeHosts []net.IP
 	var returnError error
 
-	// Worker pool semaphore
 	sem := make(chan struct{}, 2048)
 
 	go func() {
@@ -51,23 +49,39 @@ func ProbeHostsICMP(ifaceDetails *InterfaceDetails, timeout time.Duration) ([]ne
 		for _, ip := range allIPs {
 			wg.Add(1)
 			sem <- struct{}{}
-			go func(ip net.IP) {
+			go func(ip net.IP, timeout time.Duration) {
 				defer wg.Done()
 				defer func() { <-sem }()
-				pinger, err := ping.NewPinger(ip.String())
-				if err != nil {
-					resultsChan <- pingResult{nil, err}
-					return
+				var (
+					retryCount int
+					maxRetries = 2
+					pinger     *ping.Pinger
+					err        error
+				)
+				for {
+					pinger, err = ping.NewPinger(ip.String())
+					if err != nil {
+						resultsChan <- pingResult{nil, err}
+						return
+					}
+					pinger.SetPrivileged(true)
+					pinger.Size = 32
+					pinger.Count = 5
+					pinger.Timeout = timeout
+					pinger.OnRecv = func(pkt *ping.Packet) {
+						resultsChan <- pingResult{pkt.IPAddr.IP, nil}
+					}
+					pinger.Run()
+					if pinger.Statistics().PacketsRecv > 0 {
+						break
+					}
+					retryCount++
+					if retryCount > maxRetries {
+						break
+					}
+					timeout *= 2
 				}
-				pinger.SetPrivileged(true)
-				pinger.Size = 24
-				pinger.Count = 2
-				pinger.Timeout = timeout
-				pinger.OnRecv = func(pkt *ping.Packet) {
-					resultsChan <- pingResult{pkt.IPAddr.IP, nil}
-				}
-				pinger.Run()
-			}(ip)
+			}(ip, initialTimeout)
 		}
 	}
 

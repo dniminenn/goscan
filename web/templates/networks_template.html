@@ -50,14 +50,31 @@
         .value {
             color: #FFC107; /* Amber */
         }
+        .loading {
+            font-size: 2em;
+            color: #4CAF50; /* Greenish */
+            margin: 20px;
+            display: none; /* Hide by default */
+        }
     </style>
     <script>
+        function showLoading() {
+            const loadingElement = document.querySelector('.loading');
+            loadingElement.style.display = 'block';
+        }
+
+        function hideLoading() {
+            const loadingElement = document.querySelector('.loading');
+            loadingElement.style.display = 'none';
+        }
+
         function fetchData() {
+            showLoading();
             fetch('/all')
                 .then(response => response.json())
                 .then(data => {
                     const container = document.querySelector('.container');
-                    container.innerHTML = ''; // Clear previous data
+                    container.innerHTML = '';
                     for (const [key, value] of Object.entries(data)) {
                         const networkEl = document.createElement('div');
                         networkEl.className = 'network';
@@ -70,17 +87,22 @@
                         `;
                         container.appendChild(networkEl);
                     }
+                    hideLoading();
                 })
-                .catch(error => console.error('Error fetching data:', error));
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    hideLoading();
+                });
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            fetchData(); // Fetch data when document loads
-            setInterval(fetchData, 60000); // Refresh data every 60 seconds
+            fetchData();
+            setInterval(fetchData, 60000);
         });
     </script>
 </head>
 <body>
+    <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
     <div class="container"></div>
 </body>
 </html>
