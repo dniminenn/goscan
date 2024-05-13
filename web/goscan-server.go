@@ -9,6 +9,7 @@ package main
 import (
 	"embed"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os/user"
@@ -43,6 +44,12 @@ func main() {
 	router := gin.New()
 
 	router.Use(gin.Logger(), gin.Recovery())
+	
+	templatesFS, err := fs.Sub(embeddedFiles, "templates/static")
+    if err != nil {
+        log.Fatal(err)
+    }
+    router.StaticFS("/static", http.FS(templatesFS))
 
 	router.GET("/", allNetworksHTMLHandler)
 	router.GET("/networks", listNetworksHandler)
@@ -115,14 +122,14 @@ func allNetworksHandler(c *gin.Context) {
 }
 
 func allNetworksHTMLHandler(c *gin.Context) {
-	tmpl, err := template.ParseFS(embeddedFiles, "templates/networks_template.html")
+	tmpl, err := template.ParseFS(embeddedFiles, "templates/allnetworks.html")
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to load template")
 		return
 	}
 
 	c.Header("Content-Type", "text/html")
-	err = tmpl.Execute(c.Writer, nil) // No need to pass data to the template
+	err = tmpl.Execute(c.Writer, nil)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to render template")
 		return

@@ -29,7 +29,7 @@ func ProbeHostsICMP(ifaceDetails *InterfaceDetails, initialTimeout time.Duration
 	var activeHosts []net.IP
 	var returnError error
 
-	sem := make(chan struct{}, 2048)
+	sem := make(chan struct{}, 512)
 
 	go func() {
 		for result := range resultsChan {
@@ -54,7 +54,7 @@ func ProbeHostsICMP(ifaceDetails *InterfaceDetails, initialTimeout time.Duration
 				defer func() { <-sem }()
 				var (
 					retryCount int
-					maxRetries = 2
+					maxRetries = 1
 					pinger     *ping.Pinger
 					err        error
 				)
@@ -65,8 +65,8 @@ func ProbeHostsICMP(ifaceDetails *InterfaceDetails, initialTimeout time.Duration
 						return
 					}
 					pinger.SetPrivileged(true)
-					pinger.Size = 32
-					pinger.Count = 5
+					pinger.Size = 24
+					pinger.Count = 1
 					pinger.Timeout = timeout
 					pinger.OnRecv = func(pkt *ping.Packet) {
 						resultsChan <- pingResult{pkt.IPAddr.IP, nil}
