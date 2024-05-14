@@ -7,8 +7,10 @@
 package networkutils
 
 import (
+	"bytes"
 	"math"
 	"net"
+	"sort"
 )
 
 func CalcSubnetSize(subnetBits []int) int {
@@ -30,6 +32,12 @@ func CalculateTotalIPsScanned(ifaces []InterfaceDetails) int {
 		totalIPsScanned += CalcSubnetSize(iface.SubnetBits)
 	}
 	return totalIPsScanned
+}
+
+func SortIPs(ips []net.IP) {
+    sort.Slice(ips, func(i, j int) bool {
+        return bytes.Compare(ips[i], ips[j]) < 0
+    })
 }
 
 func incrementIP(ip net.IP) {
