@@ -9,9 +9,34 @@ package networkutils
 import (
 	"fmt"
 	"net"
+
+	"goscan/config"
 )
 
+type InterfaceDetails struct {
+    Name       string
+    IPs        []net.IP
+    SubnetBits []int
+    MACAddress net.HardwareAddr
+}
+
+type InterfaceDetailsJSON struct {
+	InterfaceDetails
+	MACAddress string `json:"MACAddress"`
+}
+
+func (iface *InterfaceDetails) ToJSON() InterfaceDetailsJSON {
+	return InterfaceDetailsJSON{
+		InterfaceDetails: *iface,
+		MACAddress:       iface.MACAddress.String(),
+	}
+}
+
+
+
 func DiscoverInterfaces() ([]InterfaceDetails, error) {
+    config := config.GetServerConfig()
+
     interfaces, err := net.Interfaces()
     if err != nil {
         return nil, fmt.Errorf("failed to get network interfaces: %w", err)
@@ -40,14 +65,17 @@ func DiscoverInterfaces() ([]InterfaceDetails, error) {
             }
         }
 
-        if len(ips) > 0 {  // Check if there are any IPs before adding the details
+        if len(ips) > 0 {
             detail := InterfaceDetails{
                 Name:       iface.Name,
                 IPs:        ips,
                 SubnetBits: subnets,
                 MACAddress: iface.HardwareAddr,
             }
-            details = append(details, detail)
+            // exclude interfaces with subnets that are too large
+            if CalcSubnetSize(subnets) <= CalcSubnetSizeSingle(config.MaxSubnetSize) {
+                details = append(details, detail)
+            }
         }
     }
     return details, nil
