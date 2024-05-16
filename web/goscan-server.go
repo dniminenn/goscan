@@ -14,15 +14,14 @@ import (
 	"log"
 	"net/http"
 	"os/user"
-	"sync"
 	"text/template"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/gin-gonic/gin"
 
 	"goscan/config"
 	"goscan/networkutils"
+	"goscan/sslutils"
 	"goscan/stats"
 )
 
@@ -63,7 +62,7 @@ func main() {
 	log.Printf("Starting server at %s", address)
 
 	if serverConfig.SSLCertFile != "" && serverConfig.SSLKeyFile != "" {
-		reloader, err := NewCertReloader(serverConfig.SSLCertFile, serverConfig.SSLKeyFile)
+		reloader, err := sslutils.NewCertReloader(serverConfig.SSLCertFile, serverConfig.SSLKeyFile)
 		if err != nil {
 			log.Fatalf("Failed to initialize certificate reloader: %v", err)
 		}
@@ -161,83 +160,5 @@ func allNetworksHTMLHandler(c *gin.Context) {
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to render template")
 		return
-	}
-}
-
-// SSL certificate reloader
-type CertReloader struct {
-	mu       sync.RWMutex
-	cert     *tls.Certificate
-	certFile string
-	keyFile  string
-}
-
-func NewCertReloader(certFile, keyFile string) (*CertReloader, error) {
-	reloader := &CertReloader{certFile: certFile, keyFile: keyFile}
-	err := reloader.loadCert()
-	if err != nil {
-		return nil, err
-	}
-	go reloader.watchCert()
-	return reloader, nil
-}
-
-func (r *CertReloader) loadCert() error {
-	cert, err := tls.LoadX509KeyPair(r.certFile, r.keyFile)
-	if err != nil {
-		return err
-	}
-	r.mu.Lock()
-	r.cert = &cert
-	r.mu.Unlock()
-	return nil
-}
-
-func (r *CertReloader) watchCert() {
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer watcher.Close()
-
-	err = watcher.Add(r.certFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = watcher.Add(r.keyFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for {
-		select {
-		case event, ok := <-watcher.Events:
-			if !ok {
-				return
-			}
-			if event.Op&fsnotify.Write == fsnotify.Write {
-				log.Println("Detected change in certificate files, reloading...")
-				time.Sleep(1 * time.Second) // Sleep for a second to ensure the file is fully written
-				err := r.loadCert()
-				if err != nil {
-					log.Println("Failed to reload certificate:", err)
-				} else {
-					log.Println("Certificate reloaded successfully.")
-				}
-			}
-		case err, ok := <-watcher.Errors:
-			if !ok {
-				return
-			}
-			log.Println("Error watching certificate files:", err)
-		}
-	}
-}
-
-func (r *CertReloader) GetCertificateFunc() func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
-	return func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
-		r.mu.RLock()
-		defer r.mu.RUnlock()
-		return r.cert, nil
 	}
 }
