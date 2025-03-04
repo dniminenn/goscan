@@ -3,46 +3,55 @@
 ![goscan Screenshot](./goscan.png)
 
 ## Overview
-Goscan is a network scanner using ICMP to detect hosts. The CLI tool scans network interfaces, and the server provides a web interface for enumerating alive hosts.
+Network scanner using ICMP to detect hosts. CLI tool scans interfaces, server provides web UI for host enumeration.
 
-## Build
-- CLI tool: `go build ./cmd/goscan.go`
-- Server: `go build ./web/goscan-server.go`
-
-## Usage
-**CLI Tool:**
-
+## Install
 ```bash
-goscan --interface eth0 --timeout 1000 --measure
-goscan -i eth0 -t 1000 -m
+go build ./cmd/goscan.go
+go build ./web/goscan-server.go
 ```
 
-If no interface is specified, it scans all available interfaces.
-
-Server:
-
+## CLI Usage
 ```bash
+# Basic scan
+./goscan
 
-./goscan-server --listen-address "192.168.1.1" --listen-port "8080" --timeout 500
-./goscan-server -l "192.168.1.1" -p "8080" -t 500
+# Specific interface
+./goscan -i eth0 -t 1000 -m
+
+# Show only alive hosts
+./goscan alive -i eth0
+
+# Show only available IPs
+./goscan available -i eth0
 ```
 
-## Command Line Arguments
-
-**CLI Tool:**
+## Server Usage
 ```bash
-    --interface, -i: Specify network interface (optional).
-    --timeout, -t: Timeout in milliseconds (default: 500).
-    --measure, -m: Enable execution time measurement.
+./goscan server -l "192.168.1.1" -p "8080" -t 500
 ```
-**Server:**
-```bash
-    --listen-address, -l: IP address for the server (default: "0.0.0.0").
-    --listen-port, -p: Port number (default: "8080").
-    --timeout, -t: Timeout in milliseconds (default: 500).
+
+## Options
+### CLI
 ```
-## Privileges
+-i, --interface    Network interface
+-t, --timeout      Timeout in ms (default: 500)
+-m, --measure      Show execution time
+-s, --show         Mode: all, alive, available
+-q, --scriptable   Raw output
+```
 
-Administrator privileges are required for network scanning operations.
+### Server
+```
+-l, --listen-address   Server IP (default: 0.0.0.0)
+-p, --listen-port      Port (default: 8080)
+-t, --timeout          Timeout in ms (default: 500)
+--ssl-cert             SSL certificate file
+--ssl-key              SSL key file
+--max-subnet-size      Max subnet size (default: 1024)
+```
 
-## MIT License 2024 Darius Niminenn
+## Requires administrator privileges
+
+## License
+MIT License © 2024 Darius Niminenn

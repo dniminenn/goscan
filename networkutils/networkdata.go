@@ -34,7 +34,7 @@ func FetchAllNetworkData(timeout time.Duration) (map[string]interface{}, error) 
 		wg.Add(1)
 		go func(iface InterfaceDetails) {
 			defer wg.Done()
-			activeHosts, err := ProbeHostsICMP(&iface, timeout)
+			activeHosts, allHosts, err := ProbeHosts(&iface, timeout)
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
@@ -42,7 +42,7 @@ func FetchAllNetworkData(timeout time.Duration) (map[string]interface{}, error) 
 				return
 			}
 			SortIPs(activeHosts)
-			totalIpsScanned := CalcSubnetSize(iface.SubnetBits)
+			totalIpsScanned := len(allHosts)
 
 			results[iface.Name] = map[string]interface{}{
 				"MACAddress":      iface.MACAddress.String(),
@@ -55,9 +55,18 @@ func FetchAllNetworkData(timeout time.Duration) (map[string]interface{}, error) 
 
 	elapsed := time.Since(startTime)
 
+	totalIPsScanned := 0
+	for _, result := range results {
+		if resultMap, ok := result.(map[string]interface{}); ok {
+			if scanned, ok := resultMap["TotalIPsScanned"].(int); ok {
+				totalIPsScanned += scanned
+			}
+		}
+	}
+
 	return map[string]interface{}{
 		"results":         results,
 		"elapsedTime":     elapsed,
-		"totalIPsScanned": calculateTotalIPsScanned(ifaces),
+		"totalIPsScanned": totalIPsScanned,
 	}, nil
 }

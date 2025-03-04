@@ -7,9 +7,9 @@ import (
 )
 
 type Stats struct {
-	MemAlloc    uint64
-	Sys         uint64
-	LastPauseNs uint64
+	MemAlloc     uint64
+	Sys          uint64
+	LastPauseNs  uint64
 	NumGoroutine int
 }
 

@@ -1,93 +1,90 @@
-// SPDX-License-Identifier: MIT
-
-/*
-   goscan is a simple network scanner that uses ICMP echo requests to
-   detect active hosts on a network.
-
-   Usage:
-       goscan --interface eth0 --timeout 1000 --measure
-       goscan -i eth0 -t 1000 -m
-
-   If the --interface flag is not provided, goscan will scan all
-   available interfaces.
-
-   Author: Darius Niminenn
-*/
-
 package main
 
 import (
-	"flag"
 	"fmt"
-	"goscan/networkutils"
-	"log"
-	"sync"
-	"time"
-)
+	"os"
 
-const (
-    colorReset  = "\033[0m"
-    colorRed    = "\033[31m"
-    colorGreen  = "\033[32m"
-    colorYellow = "\033[33m"
-    colorBlue   = "\033[34m"
-    colorPurple = "\033[35m"
-    colorCyan   = "\033[36m"
-    colorWhite  = "\033[37m"
-    boldText    = "\033[1m"
+	"github.com/spf13/cobra"
 )
 
 func main() {
-    initialTime := time.Now()
+	Execute()
+}
 
-    ifaceName := flag.String("interface", "", "Specify the network interface name")
-    shortIfaceName := flag.String("i", "", "Specify the network interface name (short)")
-    timeout := flag.Int("timeout", 500, "Specify the timeout in milliseconds")
-    measureExecutionTime := flag.Bool("measure", false, "Measure the execution time")
-    flag.Parse()
+func Execute() {
+	rootCmd := NewRootCmd()
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
 
-    if *ifaceName == "" && *shortIfaceName != "" {
-        ifaceName = shortIfaceName
-    }
+// Modify NewRootCmd() in goscan.go to add the subcommands and show flag
+func NewRootCmd() *cobra.Command {
+	rootCmd := &cobra.Command{
+		Use:   "goscan",
+		Short: "Goscan is a network scanner using ICMP to detect active hosts",
+		Long: `A network scanner using ICMP echo requests to detect active hosts on a network.
+Root command without subcommands will run in CLI mode.`,
+		Run: runCLI,
+	}
 
-    ifaces, err := networkutils.DiscoverInterfaces()
-    if err != nil {
-        log.Fatalf("Error discovering interfaces: %v", err)
-    }
+	rootCmd.PersistentFlags().IntP("timeout", "t", 500, "Timeout in milliseconds")
+	rootCmd.PersistentFlags().StringP("interface", "i", "", "Specify network interface name")
+	rootCmd.PersistentFlags().BoolP("measure", "m", false, "Measure execution time")
+	rootCmd.PersistentFlags().StringP("show", "s", "all", "Show mode: all, alive, or available")
+	rootCmd.PersistentFlags().BoolP("scriptable", "q", false, "Scriptable output (no headers, no extra text)")
 
-    var wg sync.WaitGroup
-    found := false
-    for _, iface := range ifaces {
-        if *ifaceName != "" && iface.Name != *ifaceName {
-            continue
-        }
-        found = true
-        wg.Add(1)
-        go func(iface networkutils.InterfaceDetails) {
-            defer wg.Done()
-            activeHosts, err := networkutils.ProbeHostsICMP(&iface, time.Duration(*timeout)*time.Millisecond)
-            if err != nil {
-                fmt.Printf(colorRed+"Error probing hosts on interface %s: %v"+colorReset+"\n", iface.Name, err)
-                return
-            }
-            networkutils.SortIPs(activeHosts)
-            if len(activeHosts) > 0 {
-                fmt.Printf(boldText+colorCyan+"%s [%s]"+colorReset+"\n", iface.Name, iface.MACAddress)
-                for _, host := range activeHosts {
-                    fmt.Println(colorGreen+" ✓"+colorReset, host)
-                }
-                fmt.Println(fmt.Sprintf("Total active hosts on %s: "+boldText+colorGreen+"%d"+colorReset, iface.Name, len(activeHosts)))
-            } else {
-                fmt.Println("    " + colorPurple + "No active hosts found on this interface." + colorReset)
-            }
-        }(iface)
-    }
+	aliveCmd := &cobra.Command{
+		Use:     "alive",
+		Aliases: []string{"online", "used", "taken"},
+		Short:   "Show only alive hosts in a scriptable format",
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.Flags().Set("show", "alive")
+			cmd.Flags().Set("scriptable", "true")
+			runCLI(cmd, args)
+		},
+	}
 
-    wg.Wait()
+	availableCmd := &cobra.Command{
+		Use:     "available",
+		Aliases: []string{"offline", "unused", "free"},
+		Short:   "Show only available IPs in a scriptable format",
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.Flags().Set("show", "available")
+			cmd.Flags().Set("scriptable", "true")
+			runCLI(cmd, args)
+		},
+	}
 
-    if *ifaceName != "" && !found {
-        fmt.Printf(colorRed+"No interface found with the name '%s'"+colorReset+"\n", *ifaceName)
-    } else if *measureExecutionTime {
-        fmt.Printf(boldText+colorBlue+"Execution time: %v"+colorReset+"\n", time.Since(initialTime))
-    }
+	aliveCmd.PersistentFlags().IntP("timeout", "t", 500, "Timeout in milliseconds")
+	aliveCmd.PersistentFlags().StringP("interface", "i", "", "Specify network interface name")
+	aliveCmd.PersistentFlags().BoolP("measure", "m", false, "Measure execution time")
+
+	availableCmd.PersistentFlags().IntP("timeout", "t", 500, "Timeout in milliseconds")
+	availableCmd.PersistentFlags().StringP("interface", "i", "", "Specify network interface name")
+	availableCmd.PersistentFlags().BoolP("measure", "m", false, "Measure execution time")
+
+	rootCmd.AddCommand(aliveCmd)
+	rootCmd.AddCommand(availableCmd)
+	rootCmd.AddCommand(NewServerCmd())
+
+	return rootCmd
+}
+
+func NewServerCmd() *cobra.Command {
+	serverCmd := &cobra.Command{
+		Use:   "server",
+		Short: "Run goscan in server mode with web interface",
+		Long:  `Run goscan in server mode with a web interface for enumerating alive hosts.`,
+		Run:   runServer,
+	}
+
+	serverCmd.Flags().StringP("listen-address", "l", "0.0.0.0", "IP address for the server")
+	serverCmd.Flags().StringP("listen-port", "p", "8080", "Port number")
+	serverCmd.Flags().String("ssl-cert", "", "SSL certificate file")
+	serverCmd.Flags().String("ssl-key", "", "SSL key file")
+	serverCmd.Flags().Int("max-subnet-size", 1024, "Maximum subnet size to scan")
+
+	return serverCmd
 }
